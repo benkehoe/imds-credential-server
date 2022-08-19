@@ -29,8 +29,7 @@ $ imds-credential-server 8081
 
 And then run a container in a separate terminal. **Note the trailing slash on the URL.**
 ```bash
-$ docker run --rm -p 8081:8081 -e AWS_EC2_METADATA_SERVICE_ENDPOINT=http://host.docker.internal:8081/
-amazon/aws-cli sts get-caller-identity
+$ docker run --rm -p 8081:8081 -e AWS_EC2_METADATA_SERVICE_ENDPOINT=http://host.docker.internal:8081/ amazon/aws-cli sts get-caller-identity
 {
     "UserId": "AROAXXXXXXXXXXXXXXXXX:SessionName",
     "Account": "123456789012",
