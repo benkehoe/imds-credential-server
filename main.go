@@ -37,7 +37,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
-var Version string = "0.2"
+var Version string = "0.3"
 
 type innerError struct {
 	Code    string
@@ -317,6 +317,9 @@ func main() {
 	_, err := strconv.Atoi(*spec)
 	if err == nil {
 		*spec = ":" + *spec
+	}
+	if strings.HasPrefix(*spec, ":") {
+		*spec = "localhost" + *spec
 	}
 
 	rand.Seed(time.Now().UnixMicro())

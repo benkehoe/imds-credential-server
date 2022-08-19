@@ -24,6 +24,7 @@ $ cd imds-credential-server && go run .
 Run the server in one terminal.
 It needs to have credentials available to it in the normal manner; the `--profile` option works as you'd expect.
 
+It will bind to localhost by default, if you need something different use the `HOST:PORT` format.
 ```bash
 $ imds-credential-server 8081
 ```
