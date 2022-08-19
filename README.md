@@ -21,7 +21,9 @@ $ cd imds-credential-server && go run .
 
 
 ## Use
-Run the server in one terminal:
+Run the server in one terminal.
+It needs to have credentials available to it in the normal manner.
+To use a particular profile set the `AWS_PROFILE` environment variable.
 
 ```bash
 $ imds-credential-server 8081
