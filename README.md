@@ -15,7 +15,7 @@ $ go install github.com/benkehoe/imds-credential-server@main
 * Clone the repo
 ```bash
 $ git clone https://github.com/benkehoe/imds-credential-server
-$ cd imds-credential-server && go run .
+$ cd imds-credential-server && go build .
 ```
 
 
