@@ -8,7 +8,7 @@ This is better than mounting your `~/.aws` directory into a container as a) it a
 ## Quickstart
 
 Install from source or with `go install`.
-[`go install` will install to `$GOPATH/bin` or `$HOME/go/bin`](https://pkg.go.dev/cmd/go#hdr-Compile_and_install_packages_and_dependencies), so ensure that directory is on your `$PATH`.
+[`go install` will install to `$GOBIN` or `$GOPATH/bin` or `$HOME/go/bin`](https://pkg.go.dev/cmd/go#hdr-Compile_and_install_packages_and_dependencies), so ensure that directory is on your `$PATH`.
 
 
 ```bash
