@@ -21,6 +21,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -36,7 +37,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
-var Version string = "0.1"
+var Version string = "0.2"
 
 type innerError struct {
 	Code    string
@@ -298,24 +299,29 @@ func (cfg *Config) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
-	if len(os.Args) < 2 {
+	spec := flag.String("port", "", "[HOST:]PORT, can provide as a positional arg")
+	profile := flag.String("profile", "", "A config profile to use")
+	flag.Parse()
+
+	if *spec == "" {
+		*spec = flag.Arg(0)
+	}
+	if *spec == "" {
 		fmt.Fprintln(os.Stderr, "Error: Port not specified")
 		os.Exit(1)
 	}
-
-	spec := os.Args[1]
-	if spec == "version" {
+	if *spec == "version" {
 		fmt.Println(Version)
 		os.Exit(0)
 	}
-	_, err := strconv.Atoi(spec)
+	_, err := strconv.Atoi(*spec)
 	if err == nil {
-		spec = ":" + spec
+		*spec = ":" + *spec
 	}
 
 	rand.Seed(time.Now().UnixMicro())
 
-	awsConfig, err := config.LoadDefaultConfig(context.TODO())
+	awsConfig, err := config.LoadDefaultConfig(context.TODO(), config.WithSharedConfigProfile(*profile))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -324,5 +330,5 @@ func main() {
 
 	fmt.Printf("Identity: %s\n", config.PrincipalArn)
 
-	log.Fatal(http.ListenAndServe(spec, config))
+	log.Fatal(http.ListenAndServe(*spec, config))
 }
