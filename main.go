@@ -245,30 +245,59 @@ func (cfg *Config) handleCredentialRequest(w http.ResponseWriter, req *http.Requ
 		writeError(w, http.StatusInternalServerError, "InternalServerError", "Something went wrong")
 		return
 	}
-	creds := Credentials{
-		AccessKeyId:     awsCreds.AccessKeyID,
-		SecretAccessKey: awsCreds.SecretAccessKey,
-	}
-	if awsCreds.SessionToken != "" {
-		creds.Token = awsCreds.SessionToken
-	}
-	if !awsCreds.Expires.IsZero() {
-		expiration, err := awsCreds.Expires.MarshalText()
+	creds := Credentials{}
+	if awsCreds.SessionToken == "" {
+		// If we have static credentials, the SDK doesn't know what to do if it sees
+		// static keypairs in IMDS.  Get a session token with our static keypair, and
+		// return it.
+		stsClient := sts.NewFromConfig(cfg.AwsConfig)
+		sessionCreds, err := stsClient.GetSessionToken(context.TODO(), &sts.GetSessionTokenInput{})
 		if err != nil {
 			log.Println(err)
 			writeError(w, http.StatusInternalServerError, "InternalServerError", "Something went wrong")
 			return
 		}
-		creds.Expiration = string(expiration)
+		// Expiration has a method of .String() but it returns it in a format awscli doesn't understand.
+
+		sessionExpiration, err := sessionCreds.Credentials.Expiration.MarshalText()
+		if err != nil {
+			log.Println(err)
+			writeError(w, http.StatusInternalServerError, "InternalServerError", "Something went wrong")
+			return
+		}
+
+		creds = Credentials{
+			AccessKeyId:     *sessionCreds.Credentials.AccessKeyId,
+			SecretAccessKey: *sessionCreds.Credentials.SecretAccessKey,
+			Token:           *sessionCreds.Credentials.SessionToken,
+			Expiration:      string(sessionExpiration),
+		}
+
 	} else {
-		expirationTime := time.Now().Add(time.Hour)
-		expiration, err := expirationTime.MarshalText()
-		if err != nil {
-			log.Println(err)
-			writeError(w, http.StatusInternalServerError, "InternalServerError", "Something went wrong")
-			return
+		// We have a standard session, proceed as normal
+		creds = Credentials{
+			AccessKeyId:     awsCreds.AccessKeyID,
+			SecretAccessKey: awsCreds.SecretAccessKey,
+			Token:           awsCreds.SessionToken,
 		}
-		creds.Expiration = string(expiration)
+		if !awsCreds.Expires.IsZero() {
+			expiration, err := awsCreds.Expires.MarshalText()
+			if err != nil {
+				log.Println(err)
+				writeError(w, http.StatusInternalServerError, "InternalServerError", "Something went wrong")
+				return
+			}
+			creds.Expiration = string(expiration)
+		} else {
+			expirationTime := time.Now().Add(time.Hour)
+			expiration, err := expirationTime.MarshalText()
+			if err != nil {
+				log.Println(err)
+				writeError(w, http.StatusInternalServerError, "InternalServerError", "Something went wrong")
+				return
+			}
+			creds.Expiration = string(expiration)
+		}
 	}
 
 	bodyBytes, err := json.Marshal(creds)
