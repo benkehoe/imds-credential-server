@@ -47,4 +47,6 @@ Then map the port from the host to the container, and set the environment variab
 AWS SDKs run inside the container should just work, as should any tool that relies on them.
 For tools that don't correctly accept the full range of AWS credential sources, check out [aws-export-credentials](https://github.com/benkehoe/aws-export-credentials), ideally using it inside the container.
 
+If you're using static credentials from an IAM User or, god forbid, account root, it will use [STS.GetSessionToken](https://docs.aws.amazon.com/STS/latest/APIReference/API_GetSessionToken.html) to turn these into temporary credentials, which both matches IMDSv2 on EC2 (those are always temporary role credentials) and reduces the security risk of providing those credentials.
+
 You can use `imds-credential-server version` to get the version (this project uses [monotonic versioning](http://blog.appliedcompscilab.com/monotonic_versioning_manifesto/)).
