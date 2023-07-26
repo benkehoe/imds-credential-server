@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -25,7 +26,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
@@ -358,8 +358,6 @@ func main() {
 	if strings.HasPrefix(*spec, ":") {
 		*spec = "localhost" + *spec
 	}
-
-	rand.Seed(time.Now().UnixMicro())
 
 	awsConfig, err := config.LoadDefaultConfig(context.TODO(), config.WithSharedConfigProfile(*profile))
 	if err != nil {
