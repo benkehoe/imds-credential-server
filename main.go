@@ -37,7 +37,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
-var Version string = "0.3"
+var Version string = "0.4"
 
 type innerError struct {
 	Code    string
