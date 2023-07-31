@@ -196,7 +196,7 @@ func (cfg *Config) handleTokenRequest(w http.ResponseWriter, req *http.Request) 
 	ttl := time.Second * time.Duration(ttlInt)
 
 	bodyBytes := cfg.EncodeToken(ttl)
-
+	w.Header().Add("X-aws-ec2-metadata-token-ttl-seconds", ttlStr)
 	w.Header().Add("Content-type", "text/plain")
 	w.Write(bodyBytes)
 }
@@ -236,6 +236,7 @@ type Credentials struct {
 	SecretAccessKey string
 	Token           string
 	Expiration      string
+	Code            string
 }
 
 func getTemporaryCredentials(awsConfig aws.Config) (Credentials, error) {
@@ -258,6 +259,7 @@ func getTemporaryCredentials(awsConfig aws.Config) (Credentials, error) {
 		SecretAccessKey: *sessionCreds.Credentials.SecretAccessKey,
 		Token:           *sessionCreds.Credentials.SessionToken,
 		Expiration:      string(sessionExpiration),
+		Code:            "Success",
 	}
 
 	return creds, nil
@@ -295,6 +297,7 @@ func (cfg *Config) GetCredentials() (Credentials, error) {
 		SecretAccessKey: awsCreds.SecretAccessKey,
 		Token:           awsCreds.SessionToken,
 		Expiration:      string(expiration),
+		Code:            "Success",
 	}
 
 	return creds, nil
