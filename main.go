@@ -233,7 +233,7 @@ func (cfg *Config) handleRoleRequest(w http.ResponseWriter, req *http.Request) {
 	io.WriteString(w, cfg.PrincipalName)
 }
 
-type Credentials struct {
+type Response struct {
 	AccessKeyId     string
 	SecretAccessKey string
 	Token           string
@@ -245,8 +245,8 @@ type Credentials struct {
 	Type        string
 }
 
-func getTemporaryCredentials(awsConfig aws.Config) (Credentials, error) {
-	creds := Credentials{}
+func getTemporaryCredentials(awsConfig aws.Config) (Response, error) {
+	creds := Response{}
 	stsClient := sts.NewFromConfig(awsConfig)
 	sessionCreds, err := stsClient.GetSessionToken(context.TODO(), &sts.GetSessionTokenInput{})
 	if err != nil {
@@ -259,7 +259,7 @@ func getTemporaryCredentials(awsConfig aws.Config) (Credentials, error) {
 		return creds, err
 	}
 
-	creds = Credentials{
+	creds = Response{
 		AccessKeyId:     *sessionCreds.Credentials.AccessKeyId,
 		SecretAccessKey: *sessionCreds.Credentials.SecretAccessKey,
 		Token:           *sessionCreds.Credentials.SessionToken,
@@ -272,8 +272,8 @@ func getTemporaryCredentials(awsConfig aws.Config) (Credentials, error) {
 	return creds, nil
 }
 
-func (cfg *Config) GetCredentials() (Credentials, error) {
-	creds := Credentials{}
+func (cfg *Config) GetCredentials() (Response, error) {
+	creds := Response{}
 	awsCreds, err := cfg.AwsConfig.Credentials.Retrieve(context.TODO())
 	if err != nil {
 		return creds, err
@@ -299,7 +299,7 @@ func (cfg *Config) GetCredentials() (Credentials, error) {
 		return creds, err
 	}
 
-	creds = Credentials{
+	creds = Response{
 		AccessKeyId:     awsCreds.AccessKeyID,
 		SecretAccessKey: awsCreds.SecretAccessKey,
 		Token:           awsCreds.SessionToken,
