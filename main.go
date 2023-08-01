@@ -233,6 +233,8 @@ func (cfg *Config) handleRoleRequest(w http.ResponseWriter, req *http.Request) {
 	io.WriteString(w, cfg.PrincipalName)
 }
 
+// This is based on the example output in the IMDS documentation:
+// https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html#instance-metadata-security-credentials
 type Response struct {
 	AccessKeyId     string
 	SecretAccessKey string
@@ -245,44 +247,50 @@ type Response struct {
 	Type        string
 }
 
-func getTemporaryCredentials(awsConfig aws.Config) (Response, error) {
-	creds := Response{}
+func generateResponseWithTemporaryCredentials(awsConfig aws.Config) (Response, error) {
+	response := Response{}
 	stsClient := sts.NewFromConfig(awsConfig)
 	sessionCreds, err := stsClient.GetSessionToken(context.TODO(), &sts.GetSessionTokenInput{})
 	if err != nil {
-		return creds, err
+		return response, err
 	}
 
-	// Expiration has a method of .String() but it returns it in a format we can't use.
+	// time.Time has a method of .String() but it returns it in a format we can't use.
 	sessionExpiration, err := sessionCreds.Credentials.Expiration.MarshalText()
 	if err != nil {
-		return creds, err
+		return response, err
 	}
 
-	creds = Response{
+	lastUpdatedTime := time.Now().UTC()
+	lastUpdated, err := lastUpdatedTime.MarshalText()
+	if err != nil {
+		return response, err
+	}
+
+	response = Response{
 		AccessKeyId:     *sessionCreds.Credentials.AccessKeyId,
 		SecretAccessKey: *sessionCreds.Credentials.SecretAccessKey,
 		Token:           *sessionCreds.Credentials.SessionToken,
 		Expiration:      string(sessionExpiration),
 		Code:            "Success",
-		LastUpdated:     time.Now().UTC().String(),
+		LastUpdated:     string(lastUpdated),
 		Type:            "AWS-HMAC",
 	}
 
-	return creds, nil
+	return response, nil
 }
 
-func (cfg *Config) GetCredentials() (Response, error) {
-	creds := Response{}
+func (cfg *Config) GenerateResponse() (Response, error) {
+	response := Response{}
 	awsCreds, err := cfg.AwsConfig.Credentials.Retrieve(context.TODO())
 	if err != nil {
-		return creds, err
+		return response, err
 	}
 
 	if awsCreds.SessionToken == "" {
 		// Convert static credentials to temporary credentials so the return value
 		// always has a session token and expiration
-		return getTemporaryCredentials(cfg.AwsConfig)
+		return generateResponseWithTemporaryCredentials(cfg.AwsConfig)
 	}
 
 	// Make sure there's an expiration (even if it's wrong)
@@ -293,34 +301,40 @@ func (cfg *Config) GetCredentials() (Response, error) {
 		expirationTime = time.Now().Add(time.Hour)
 	}
 
-	// Expiration has a method of .String() but it returns it in a format we can't use.
+	// time.Time has a method of .String() but it returns it in a format we can't use.
 	expiration, err := expirationTime.MarshalText()
 	if err != nil {
-		return creds, err
+		return response, err
 	}
 
-	creds = Response{
+	lastUpdatedTime := time.Now().UTC()
+	lastUpdated, err := lastUpdatedTime.MarshalText()
+	if err != nil {
+		return response, err
+	}
+
+	response = Response{
 		AccessKeyId:     awsCreds.AccessKeyID,
 		SecretAccessKey: awsCreds.SecretAccessKey,
 		Token:           awsCreds.SessionToken,
 		Expiration:      string(expiration),
-		LastUpdated:     time.Now().UTC().String(),
+		LastUpdated:     string(lastUpdated),
 		Code:            "Success",
 		Type:            "AWS-HMAC",
 	}
 
-	return creds, nil
+	return response, nil
 }
 
 func (cfg *Config) handleCredentialRequest(w http.ResponseWriter, req *http.Request, role string) {
-	creds, err := cfg.GetCredentials()
+	response, err := cfg.GenerateResponse()
 	if err != nil {
 		log.Println(err)
 		writeError(w, http.StatusInternalServerError, "InternalServerError", "Something went wrong")
 		return
 	}
 
-	bodyBytes, err := json.Marshal(creds)
+	bodyBytes, err := json.Marshal(response)
 	if err != nil {
 		log.Println(err)
 		writeError(w, http.StatusInternalServerError, "InternalServerError", "Something went wrong")
