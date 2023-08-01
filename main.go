@@ -196,7 +196,9 @@ func (cfg *Config) handleTokenRequest(w http.ResponseWriter, req *http.Request) 
 	ttl := time.Second * time.Duration(ttlInt)
 
 	bodyBytes := cfg.EncodeToken(ttl)
-	w.Header().Add("X-aws-ec2-metadata-token-ttl-seconds", ttlStr)
+	// Go SDK V2 requires the response to have this header
+	// https://github.com/aws/aws-sdk-go-v2/blob/787a81828a3812407a6d90036f07449d77a0f070/feature/ec2/imds/api_op_GetToken.go#L80
+	w.Header().Add("x-aws-ec2-metadata-token-ttl-seconds", ttlStr)
 	w.Header().Add("Content-type", "text/plain")
 	w.Write(bodyBytes)
 }
@@ -236,12 +238,15 @@ type Credentials struct {
 	SecretAccessKey string
 	Token           string
 	Expiration      string
-	Code            string
+	// Go SDK V2 requires the status to be set and the value to be equal to "Success"
+	// https://github.com/aws/aws-sdk-go-v2/blob/787a81828a3812407a6d90036f07449d77a0f070/credentials/ec2rolecreds/provider.go#L220
+	Code        string
+	LastUpdated string
+	Type        string
 }
 
 func getTemporaryCredentials(awsConfig aws.Config) (Credentials, error) {
 	creds := Credentials{}
-
 	stsClient := sts.NewFromConfig(awsConfig)
 	sessionCreds, err := stsClient.GetSessionToken(context.TODO(), &sts.GetSessionTokenInput{})
 	if err != nil {
@@ -260,6 +265,8 @@ func getTemporaryCredentials(awsConfig aws.Config) (Credentials, error) {
 		Token:           *sessionCreds.Credentials.SessionToken,
 		Expiration:      string(sessionExpiration),
 		Code:            "Success",
+		LastUpdated:     time.Now().UTC().String(),
+		Type:            "AWS-HMAC",
 	}
 
 	return creds, nil
@@ -297,6 +304,7 @@ func (cfg *Config) GetCredentials() (Credentials, error) {
 		SecretAccessKey: awsCreds.SecretAccessKey,
 		Token:           awsCreds.SessionToken,
 		Expiration:      string(expiration),
+		LastUpdated:     time.Now().UTC().String(),
 		Code:            "Success",
 	}
 
