@@ -306,6 +306,7 @@ func (cfg *Config) GetCredentials() (Credentials, error) {
 		Expiration:      string(expiration),
 		LastUpdated:     time.Now().UTC().String(),
 		Code:            "Success",
+		Type:            "AWS-HMAC",
 	}
 
 	return creds, nil
