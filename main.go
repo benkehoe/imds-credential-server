@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -49,6 +48,8 @@ type errorBody struct {
 }
 
 func writeError(w http.ResponseWriter, status int, code, message string) {
+	log.Printf("Error %d: %s %s\n", status, code, message)
+
 	w.Header().Add("Content-type", "application/json")
 	w.WriteHeader(http.StatusMethodNotAllowed)
 	errorBody := errorBody{
@@ -69,6 +70,7 @@ type Config struct {
 	AwsConfig     aws.Config
 	PrincipalArn  string
 	PrincipalName string
+	Debug         bool
 }
 
 func NewConfig(awsCfg aws.Config) *Config {
@@ -168,6 +170,15 @@ func (cfg *Config) ValidateToken(token string) error {
 }
 
 func (cfg *Config) handleTokenRequest(w http.ResponseWriter, req *http.Request) {
+	if cfg.Debug {
+		log.Println("Request headers in handleTokenRequest:")
+		for name, values := range req.Header {
+			for _, value := range values {
+				log.Println("-", name, "=", value)
+			}
+		}
+	}
+
 	if req.Method != http.MethodPut {
 		writeError(w, http.StatusMethodNotAllowed, "MethodNotAllowed", "Token must be obtained with PUT")
 		return
@@ -201,9 +212,24 @@ func (cfg *Config) handleTokenRequest(w http.ResponseWriter, req *http.Request) 
 	w.Header().Add("x-aws-ec2-metadata-token-ttl-seconds", ttlStr)
 	w.Header().Add("Content-type", "text/plain")
 	w.Write(bodyBytes)
+
+	if cfg.Debug {
+		log.Println("Response from handleTokenRequest:")
+		log.Println(string(bodyBytes))
+		log.Println("Completed handleTokenRequest")
+	}
 }
 
 func (cfg *Config) handleRequest(w http.ResponseWriter, req *http.Request) {
+	if cfg.Debug {
+		log.Println("Request headers of handleRequest:")
+		for name, values := range req.Header {
+			for _, value := range values {
+				log.Println("-", name, "=", value)
+			}
+		}
+	}
+
 	if req.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "MethodNotAllowed", "Method not allowed")
 		return
@@ -221,16 +247,25 @@ func (cfg *Config) handleRequest(w http.ResponseWriter, req *http.Request) {
 
 	if req.URL.Path == "/latest/meta-data/iam/security-credentials/" {
 		cfg.handleRoleRequest(w, req)
-		return
 	} else {
 		role := req.URL.Path[len("/latest/meta-data/iam/security-credentials/"):]
 		cfg.handleCredentialRequest(w, req, role)
+	}
+
+	if cfg.Debug {
+		log.Println("Completed handleRequest")
 	}
 }
 
 func (cfg *Config) handleRoleRequest(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("Content-type", "text/plain")
 	io.WriteString(w, cfg.PrincipalName)
+
+	if cfg.Debug {
+		log.Println("Response from handleRoleRequest:")
+		log.Println(cfg.PrincipalName)
+		log.Println("Completed handleRoleRequest")
+	}
 }
 
 // This is based on the example output in the IMDS documentation:
@@ -329,20 +364,24 @@ func (cfg *Config) GenerateResponse() (Response, error) {
 func (cfg *Config) handleCredentialRequest(w http.ResponseWriter, req *http.Request, role string) {
 	response, err := cfg.GenerateResponse()
 	if err != nil {
-		log.Println(err)
 		writeError(w, http.StatusInternalServerError, "InternalServerError", "Something went wrong")
 		return
 	}
 
 	bodyBytes, err := json.Marshal(response)
 	if err != nil {
-		log.Println(err)
 		writeError(w, http.StatusInternalServerError, "InternalServerError", "Something went wrong")
 		return
 	}
 
 	w.Header().Add("Content-type", "application/json")
 	w.Write(bodyBytes)
+
+	if cfg.Debug {
+		log.Println("Response from handleCredentialRequest:")
+		log.Println(string(bodyBytes))
+		log.Println("Completed handleCredentialRequest")
+	}
 }
 
 /*
@@ -362,37 +401,40 @@ func (cfg *Config) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
-	spec := flag.String("port", "", "[HOST:]PORT, can provide as a positional arg")
-	profile := flag.String("profile", "", "A config profile to use")
+	var spec, profile string
+	var debug bool
+	flag.StringVar(&spec, "port", "", "[HOST:]PORT, can provide as a positional arg")
+	flag.StringVar(&profile, "profile", "", "A config profile to use")
+	flag.BoolVar(&debug, "verbose", debug, "Show debug output, exposes sensitive information")
 	flag.Parse()
 
-	if *spec == "" {
-		*spec = flag.Arg(0)
+	if spec == "" {
+		spec = flag.Arg(0)
 	}
-	if *spec == "" {
-		fmt.Fprintln(os.Stderr, "Error: Port not specified")
-		os.Exit(1)
+	if spec == "" {
+		log.Fatalln("Error: Port not specified")
 	}
-	if *spec == "version" {
-		fmt.Println(Version)
+	if spec == "version" {
+		log.Println(Version)
 		os.Exit(0)
 	}
-	_, err := strconv.Atoi(*spec)
+	_, err := strconv.Atoi(spec)
 	if err == nil {
-		*spec = ":" + *spec
+		spec = ":" + spec
 	}
-	if strings.HasPrefix(*spec, ":") {
-		*spec = "localhost" + *spec
+	if strings.HasPrefix(spec, ":") {
+		spec = "localhost" + spec
 	}
 
-	awsConfig, err := config.LoadDefaultConfig(context.TODO(), config.WithSharedConfigProfile(*profile))
+	awsConfig, err := config.LoadDefaultConfig(context.TODO(), config.WithSharedConfigProfile(profile))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	config := NewConfig(awsConfig)
+	config.Debug = debug
 
-	fmt.Printf("Identity: %s\n", config.PrincipalArn)
+	log.Printf("Identity: %s\n", config.PrincipalArn)
 
-	log.Fatal(http.ListenAndServe(*spec, config))
+	log.Fatal(http.ListenAndServe(spec, config))
 }
